@@ -14,6 +14,7 @@
 #include <net/ethernet.h>
 
 #include <netinet/in.h>
+#include <netinet/ip.h>
 
 #include "config.h"
 #include "cbench.h"
@@ -25,12 +26,14 @@ static int make_stats_desc_reply(struct ofp_stats_request * req, char * buf, int
 static int parse_set_config(struct ofp_header * msg);
 static int make_config_reply( int xid, char * buf, int buflen);
 static int make_vendor_reply(int xid, char * buf, int buflen);
-static int make_packet_in(int switch_id, int xid, int buffer_id, char * buf, int buflen, int mac_address);
+static int make_packet_in(int switch_id, int xid, int buffer_id, char * buf, int buflen, int mac_address, int ip);
 static int packet_out_is_lldp(struct ofp_packet_out * po);
 static void fakeswitch_handle_write(struct fakeswitch *fs);
 static void fakeswitch_learn_dstmac(struct fakeswitch *fs);
 void fakeswitch_change_status_now (struct fakeswitch *fs, int new_status);
 void fakeswitch_change_status (struct fakeswitch *fs, int new_status);
+
+#define IP_SRC_SHIFT 167772160 /* 10.0.0.0 */
 
 static struct ofp_switch_config Switch_config = {
 	.header = { 	OFP_VERSION,
@@ -51,7 +54,7 @@ static inline uint64_t ntohll(uint64_t n)
     return htonl(1) == 1 ? n : ((uint64_t) ntohl(n) << 32) | ntohl(n >> 32);
 }
 
-void fakeswitch_init(struct fakeswitch *fs, int dpid, int sock, int bufsize, int debug, int delay, enum test_mode mode, int total_mac_addresses, int learn_dstmac)
+void fakeswitch_init(struct fakeswitch *fs, int dpid, int sock, int bufsize, int debug, int delay, enum test_mode mode, int total_mac_addresses, int total_ip, int learn_dstmac)
 {
     char buf[BUFLEN];
     struct ofp_header ofph;
@@ -62,12 +65,14 @@ void fakeswitch_init(struct fakeswitch *fs, int dpid, int sock, int bufsize, int
     fs->outbuf = msgbuf_new(bufsize);
     fs->probe_state = 0;
     fs->mode = mode;
-    fs->probe_size = make_packet_in(fs->id, 0, 0, buf, BUFLEN, fs->current_mac_address++);
+    fs->probe_size = make_packet_in(fs->id, 0, 0, buf, BUFLEN, fs->current_mac_address++, fs->current_ip++);
     fs->count = 0;
     fs->switch_status = START;
     fs->delay = delay;
     fs->total_mac_addresses = total_mac_addresses;
     fs->current_mac_address = 0;
+	fs->total_ip = total_ip;
+	fs->current_ip = IP_SRC_SHIFT + 1; /* 10.0.0.1 */
     fs->xid = 1;
     fs->learn_dstmac = learn_dstmac;
     fs->current_buffer_id = 1;
@@ -290,7 +295,7 @@ static int packet_out_is_lldp(struct ofp_packet_out * po){
 }
 
 /***********************************************************************/
-static int make_packet_in(int switch_id, int xid, int buffer_id, char * buf, int buflen, int mac_address)
+static int make_packet_in(int switch_id, int xid, int buffer_id, char * buf, int buflen, int mac_address, int ip)
 {
     struct ofp_packet_in * pi;
     struct ether_header * eth;
@@ -316,6 +321,10 @@ static int make_packet_in(int switch_id, int xid, int buffer_id, char * buf, int
     // mark this as coming from us, mostly for debug
     eth->ether_dhost[5] = switch_id;
     eth->ether_shost[5] = switch_id;
+	if(ip != 0) {
+		struct iphdr *iph = (struct iphdr *)((char *) eth + sizeof(struct ether_header));
+		iph->saddr = (u_int32_t)ip;
+	}
     return sizeof(fake);
 }
 
@@ -494,8 +503,9 @@ static void fakeswitch_handle_write(struct fakeswitch *fs)
             
             fs->probe_state++;
             // TODO come back and remove this copy
-            count = make_packet_in(fs->id, fs->xid++, fs->current_buffer_id, buf, BUFLEN, fs->current_mac_address);
+            count = make_packet_in(fs->id, fs->xid++, fs->current_buffer_id, buf, BUFLEN, fs->current_mac_address, fs->current_ip);
             fs->current_mac_address = ( fs->current_mac_address + 1 ) % fs->total_mac_addresses;
+			fs->current_ip = ( fs->current_ip - IP_SRC_SHIFT + 1 ) % fs->total_ip + IP_SRC_SHIFT;
             fs->current_buffer_id =  ( fs->current_buffer_id + 1 ) % NUM_BUFFER_IDS;
             msgbuf_push(fs->outbuf, buf, count);
             debug_msg(fs, "send message %d", i);

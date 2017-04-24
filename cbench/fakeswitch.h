@@ -37,6 +37,8 @@ struct fakeswitch
     struct timeval  delay_start;        // when did the current delay start - valid if in waiting state
     int total_mac_addresses;
     int current_mac_address;
+	int total_ip;
+	int current_ip;
     int learn_dstmac;
     int current_buffer_id;
 };
@@ -53,8 +55,10 @@ struct fakeswitch
  * @param mode      Should we test throughput or latency?
  * @param total_mac_addresses      The total number of unique mac addresses
  *                                 to use for packet ins from this switch
+ * @param total_ip_address         The total number of unique ip address
+ *                                 to use for packet ins from this switch
  */
-void fakeswitch_init(struct fakeswitch *fs, int dpid, int sock, int bufsize, int debug, int delay, enum test_mode mode, int total_mac_addresses, int learn_dstmac);
+void fakeswitch_init(struct fakeswitch *fs, int dpid, int sock, int bufsize, int debug, int delay, enum test_mode mode, int total_mac_addresses, int total_ip_addresses, int learn_dstmac);
 
 
 /*** Set the desired flags for poll()

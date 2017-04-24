@@ -33,6 +33,7 @@ struct myargs my_options[] = {
     {"help",        'h', "print this message", MYARGS_NONE, {.none = 0}},
     {"loops",       'l', "loops per test",   MYARGS_INTEGER, {.integer = 16}},
     {"mac-addresses", 'M', "unique source MAC addresses per switch", MYARGS_INTEGER, {.integer = 100000}},
+	{"ip-addresses", 'A', "unique source IP addresses per switch", MYARGS_INTEGER, {.integer = 10000000}},
     {"ms-per-test", 'm', "test length in ms", MYARGS_INTEGER, {.integer = 1000}},
     {"port",        'p', "controller port",  MYARGS_INTEGER, {.integer = OFP_TCP_PORT}},
     {"ranged-test", 'r', "test range of 1..$n switches", MYARGS_FLAG, {.flag = 0}},
@@ -245,6 +246,7 @@ int main(int argc, char * argv[])
     int     controller_port      = myargs_get_default_integer(my_options, "port");
     int     n_fakeswitches= myargs_get_default_integer(my_options, "switches");
     int     total_mac_addresses = myargs_get_default_integer(my_options, "mac-addresses");
+	int     total_ip_addresses = myargs_get_default_integer(my_options, "ip-addresses");
     int     mstestlen = myargs_get_default_integer(my_options, "ms-per-test");
     int     should_test_range=myargs_get_default_flag(my_options, "ranged-test");
     int     tests_per_loop = myargs_get_default_integer(my_options, "loops");
@@ -388,7 +390,7 @@ int main(int argc, char * argv[])
         if(debug)
             fprintf(stderr,"Initializing switch %d ... ", i+1);
         fflush(stderr);
-        fakeswitch_init(&fakeswitches[i],dpid_offset+i,sock,BUFLEN, debug, delay, mode, total_mac_addresses, learn_dst_macs);
+        fakeswitch_init(&fakeswitches[i],dpid_offset+i,sock,BUFLEN, debug, delay, mode, total_mac_addresses, total_ip_addresses, learn_dst_macs);
         if(debug)
             fprintf(stderr," :: done.\n");
         fflush(stderr);
